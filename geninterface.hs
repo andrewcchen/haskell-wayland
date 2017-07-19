@@ -51,7 +51,7 @@ processType s
 type FuncSig = (String, String, [String])
 
 processFuncPtr :: String -> FuncSig
-processFuncPtr s = (snakeToCamel name, processType ret, params)
+processFuncPtr s = (snakeToCamel name, processType $ strip isSpace ret, params)
     where
     (ret, s1) = span (/= '(') $ strip isSpace s
     (name, s2) = span isIdent $ dropWhile isNotIdent s1

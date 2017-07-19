@@ -23,13 +23,14 @@ library
                        Graphics.Wayland.Server.Resource
                        Graphics.Wayland.Server.Shm
                        Graphics.Wayland.Server.Surface
+                       Graphics.Wayland.Server.Region
   other-modules:       Graphics.Wayland.Server.Internal
                        Graphics.Wayland.Server.Types
   build-depends:       base >= 4.7 && < 5
                      , mtl >= 2 && < 3
                      , unix >= 2.7 && < 3
   default-language:    Haskell2010
-  extra-libraries:     "wayland-server", "wayland-client"
+  extra-libraries:     "wayland-server"
 
 test-suite wayland-test
   type:                exitcode-stdio-1.0

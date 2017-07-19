@@ -37,3 +37,6 @@ newtype WlCompositor = WlCompositor (Ptr WlCompositor)
 
 newtype WlSurface = WlSurface (Ptr WlSurface)
     deriving (Eq, Ord, Show, Typeable, Data)
+
+newtype WlRegion = WlRegion (Ptr WlRegion)
+    deriving (Eq, Ord, Show, Typeable, Data)

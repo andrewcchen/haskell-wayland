@@ -20,9 +20,9 @@ import Graphics.Wayland.Server.Types
 
 
 foreign import ccall "wl_resource_create"
-    c_wl_resource_create :: WlClient -> WlInterface -> Int32 -> Word32 -> IO WlResource
+    c_wl_resource_create :: WlClient -> WlInterface -> Int32 -> Int32 -> IO WlResource
 wlResourceCreate :: MonadWayland s m
-                 => WlClient -> WlInterface -> Int32 -> Word32 -> m WlResource
+                 => WlClient -> WlInterface -> Int32 -> Int32 -> m WlResource
 wlResourceCreate = wrapCall .::: c_wl_resource_create -- XXX is wrapCall really necessary?
 
 foreign import ccall "wrapper"

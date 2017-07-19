@@ -6,7 +6,8 @@
 
 module Graphics.Wayland.Server.Compositor
     ( WlCompositor
-    , WlCompositorInterface
+    , WlCompositorInterface(..)
+    , wlCompositorInterface
     ) where
 
 import Control.Monad
@@ -17,6 +18,10 @@ import Foreign.C.Types
 
 import Graphics.Wayland.Server.Internal
 import Graphics.Wayland.Server.Types
+
+
+foreign import ccall "&wl_compositor_interface"
+    wlCompositorInterface :: WlInterface
 
 {-
 void (* create_surface ) (struct wl_client *client, struct wl_resource *resource, uint32_t id)

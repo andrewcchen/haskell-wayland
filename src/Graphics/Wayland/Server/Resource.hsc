@@ -20,9 +20,9 @@ import Graphics.Wayland.Server.Types
 
 
 foreign import ccall "wl_resource_create"
-    c_wl_resource_create :: WlClient -> WlInterface -> #{type int} -> #{type uint32_t} -> IO WlResource
+    c_wl_resource_create :: WlClient -> WlInterface -> Int32 -> Word32 -> IO WlResource
 wlResourceCreate :: MonadWayland s m
-                 => WlClient -> WlInterface -> #{type int} -> #{type uint32_t} -> m WlResource
+                 => WlClient -> WlInterface -> Int32 -> Word32 -> m WlResource
 wlResourceCreate = wrapCall .::: c_wl_resource_create -- XXX is wrapCall really necessary?
 
 foreign import ccall "wrapper"
@@ -47,9 +47,11 @@ foreign import ccall unsafe "wl_resource_get_user_data"
     wlResourceGetUserData :: WlResource -> IO (Ptr ())
 
 foreign import ccall unsafe "wl_resource_get_version"
-    wlResourceGetVersion :: WlResource -> #{type int}
+    c_wl_resource_get_version :: WlResource -> IO Int32
+wlResourceGetVersion :: MonadIO m => WlResource -> m Int32
+wlResourceGetVersion = liftIO . c_wl_resource_get_version
 
 foreign import ccall unsafe "wl_resource_post_no_memory"
     c_wl_resource_post_no_memory :: WlResource -> IO ()
-wlResourcePostNoMemory :: WlResource -> IO ()
+wlResourcePostNoMemory :: MonadIO m => WlResource -> m ()
 wlResourcePostNoMemory = liftIO . c_wl_resource_post_no_memory

@@ -20,8 +20,20 @@ newtype WlInterface = WlInterface (Ptr WlInterface)
 newtype WlClient = WlClient (Ptr WlClient)
     deriving (Eq, Ord, Show, Typeable, Data)
 
+--newtype WlShm = WlShm (Ptr WlShm)
+--    deriving (Eq, Ord, Show, Typeable, Data)
+
+--newtype WlShmPool = WlShmPool (Ptr WlShmPool)
+--    deriving (Eq, Ord, Show, Typeable, Data)
+
+newtype WlShmBuffer = WlShmBuffer (Ptr WlShmBuffer)
+    deriving (Eq, Ord, Show, Typeable, Data)
+
 newtype WlResource = WlResource (Ptr WlResource)
     deriving (Eq, Ord, Show, Typeable, Data)
 
 newtype WlCompositor = WlCompositor (Ptr WlCompositor)
+    deriving (Eq, Ord, Show, Typeable, Data)
+
+newtype WlSurface = WlSurface (Ptr WlSurface)
     deriving (Eq, Ord, Show, Typeable, Data)

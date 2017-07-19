@@ -6,6 +6,7 @@
 
 module Graphics.Wayland.Server.Compositor
     ( WlCompositor
+    , WlCompositorInterface
     ) where
 
 import Control.Monad
@@ -17,23 +18,20 @@ import Foreign.C.Types
 import Graphics.Wayland.Server.Internal
 import Graphics.Wayland.Server.Types
 
-
-data WlClientInterface m = WlClientInterface
-    { createSurface :: WlClient -> WlResource -> #{type uint32_t} -> m ()
-    , createRegion :: WlClient -> WlResource -> #{type uint32_t} -> m ()
+{-
+void (* create_surface ) (struct wl_client *client, struct wl_resource *resource, uint32_t id)
+void (* create_region ) (struct wl_client *client, struct wl_resource *resource, uint32_t id)
+-}
+data WlCompositorInterface m = WlCompositorInterface
+    { createSurface :: WlClient -> WlResource -> Word32 -> m ()
+    , createRegion :: WlClient -> WlResource -> Word32 -> m ()
     }
 
-type InterfaceFunc m = WlClient -> WlResource -> #{type uint32_t} -> m ()
-type InterfaceFuncIO = WlClient -> WlResource -> #{type uint32_t} -> IO ()
+foreign import ccall "wrapper" mkWlCompositorFunc0 :: (WlClient -> WlResource -> Word32 -> IO ()) -> IO (FunPtr (WlClient -> WlResource -> Word32 -> IO ()))
+foreign import ccall "wrapper" mkWlCompositorFunc1 :: (WlClient -> WlResource -> Word32 -> IO ()) -> IO (FunPtr (WlClient -> WlResource -> Word32 -> IO ()))
 
-foreign import ccall "wrapper"
-    mkInterfaceFuncPtr :: InterfaceFuncIO -> IO (FunPtr InterfaceFuncIO)
-
-instance MonadWayland s m => InterfaceImplementation (WlClientInterface m) m where
-    wrapImplementation i = do
-        let f1 x1 x2 x3 = createSurface i x1 x2 x3
-            f2 x1 x2 x3 = createRegion i x1 x2 x3
-        ref <- getStateRef
-        liftIO $ mapM (fmap castFunPtr
-                     . mkInterfaceFuncPtr
-                     . (wrapCallback ref .::)) [f1, f2]
+instance MonadWayland s m => InterfaceImplementation (WlCompositorInterface m) m where
+    wrapImplementation i = wrapCallback <$> getStateRef >>= \wcb -> liftIO $ sequence
+        [ fmap castFunPtr $ mkWlCompositorFunc0 $ wcb .:: createSurface i
+        , fmap castFunPtr $ mkWlCompositorFunc1 $ wcb .:: createRegion i
+        ]

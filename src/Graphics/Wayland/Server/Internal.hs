@@ -1,5 +1,6 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TupleSections #-}
 
 
 module Graphics.Wayland.Server.Internal
@@ -27,7 +28,7 @@ newStateRef = fmap WaylandStateRef $ newIORef Nothing
 
 class (Monad m, MonadIO m) => MonadWayland s m | m -> s where
     getStateRef :: m (WaylandStateRef s)
-    runWithState :: m a -> s -> (IO a, s)
+    runWithState :: m a -> s -> IO (a, s)
     extractState :: m s
     injectState :: s -> m ()
 
@@ -37,7 +38,7 @@ nullStateRef = unsafePerformIO $ newStateRef
 
 instance MonadWayland () IO where
     getStateRef = return nullStateRef
-    runWithState m _ = (m, ())
+    runWithState m s = fmap (,s) m
     extractState = return ()
     injectState _ = return ()
 
@@ -54,8 +55,9 @@ writeIORefWithCheck ref x = readIORef ref >>= \case
 wrapCallback :: MonadWayland s m => WaylandStateRef s -> m a -> IO a
 wrapCallback (WaylandStateRef stateRef) f = do
     state <- liftIO $ readIORefWithCheck stateRef
-    let (m, newState) = runWithState f state
-    liftIO (writeIORefWithCheck stateRef newState) >> m
+    (x, newState) <- runWithState f state
+    liftIO (writeIORefWithCheck stateRef newState)
+    return x
 
 wrapCall :: MonadWayland s m => IO a -> m a
 wrapCall f = do

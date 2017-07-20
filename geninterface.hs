@@ -41,12 +41,12 @@ processType s
     | s `startsWith` "struct " = if '*' `elem` s
         then capitalize $ snakeToCamel
            $ takeWhile isIdent $ dropWhile isNotIdent $ dropWhile isIdent s
-        else error "structs are not supported"
+        else error $ "structs are not supported: " ++ s
     | '*' `elem` s = "Ptr ()"
     | s `startsWith` "int " || s == "int" = "Int32"
     | s `startsWith` "int32_t " = "Int32"
     | s `startsWith` "uint32_t" = "Word32"
-    | otherwise = error "type not supported: " ++ s
+    | otherwise = error $ "type not supported: " ++ s
 
 type FuncSig = (String, String, [String])
 

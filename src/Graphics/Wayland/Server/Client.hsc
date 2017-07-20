@@ -1,7 +1,7 @@
 #include <wayland-server.h>
 
 module Graphics.Wayland.Server.Client
-    ( WlClient
+    (
     ) where
 
 import Foreign

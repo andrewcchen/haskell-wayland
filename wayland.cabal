@@ -8,7 +8,7 @@ license-file:        LICENSE
 author:              Author name here
 maintainer:          example@example.com
 copyright:           2017 Author name here
-category:            Web
+category:            Graphics
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
@@ -16,21 +16,25 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Graphics.Wayland.Server
+                       Graphics.Wayland.Internal
+                       Graphics.Wayland.Server.Example
                        Graphics.Wayland.Server.Client
-                       Graphics.Wayland.Server.Compositor
                        Graphics.Wayland.Server.Display
                        Graphics.Wayland.Server.Global
                        Graphics.Wayland.Server.Resource
                        Graphics.Wayland.Server.Shm
-                       Graphics.Wayland.Server.Surface
-                       Graphics.Wayland.Server.Region
   other-modules:       Graphics.Wayland.Server.Internal
                        Graphics.Wayland.Server.Types
   build-depends:       base >= 4.7 && < 5
                      , mtl >= 2 && < 3
+                     , bytestring >= 0.10 && < 0.11
+                     , text >= 1 && < 2
                      , unix >= 2.7 && < 3
+                     , hxt, hxt-xpath, split
   default-language:    Haskell2010
-  extra-libraries:     "wayland-server"
+  extra-libraries:     wayland-server
+  c-sources:           cbits/xdg-shell-unstable-v5-protocol.c
+                       cbits/xdg-shell-unstable-v6-protocol.c
 
 test-suite wayland-test
   type:                exitcode-stdio-1.0

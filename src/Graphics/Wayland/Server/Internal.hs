@@ -1,15 +1,19 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 
 module Graphics.Wayland.Server.Internal
-    ( MonadWayland, getStateRef, runWithState, extractState, injectState
+    ( module Graphics.Wayland.Internal
+    , MonadWayland, getStateRef, runWithState, extractState, injectState
     , WaylandStateRef, newStateRef
     , InterfaceImplementation, wrapImplementation
     , wrapCallback, wrapCall
     , (.:), (.::), (.:::), (.::::), (.:::::), (.::::::), (.:::::::)
     , Pointers, freePointers
+    , WaylandInterface, wlInterface, wlDispatcher
+    , WlInterface(..), WlResource(..), WlClient(..)
     ) where
 
 import Control.Monad.IO.Class
@@ -19,7 +23,12 @@ import Foreign.Marshal.Alloc
 import Foreign.Ptr
 import Foreign.StablePtr
 import System.IO.Unsafe
+import Data.Data
+import Data.Word
+import Data.Int
 
+
+import Graphics.Wayland.Internal
 
 newtype WaylandStateRef s = WaylandStateRef (IORef (Maybe s))
 
@@ -66,6 +75,22 @@ wrapCall f = do
     x <- liftIO f
     liftIO (readIORefWithCheck stateRef) >>= injectState
     return x
+
+
+newtype WlInterface = WlInterface (Ptr WlInterface) deriving (Eq, Ord, Show, Typeable, Data)
+
+newtype WlResource = WlResource (Ptr WlResource) deriving (Eq, Ord, Show, Typeable, Data)
+
+newtype WlClient = WlClient (Ptr WlClient) deriving (Eq, Ord, Show, Typeable, Data)
+
+class WaylandInterface i where
+    wlInterface :: i -> WlInterface
+    wlDispatcher :: i -> WlResource -> Word32 -> Ptr () -> IO ()
+
+
+
+
+
 
 class InterfaceImplementation i m where
     wrapImplementation :: i -> m [FunPtr ()]

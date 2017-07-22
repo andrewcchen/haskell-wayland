@@ -2,6 +2,7 @@
 
 module Graphics.Wayland.Server.Monad
     ( WlState(..)
+    , MonadWayland(..)
     , Wayland, runWayland
     , S.get, S.put, S.modify, S.modify', S.gets
     ) where
@@ -28,7 +29,7 @@ runWayland = undefined -- todo
 newtype Wayland a = Wayland (S.StateT WlState IO a)
     deriving (Functor, Applicative, Monad, MonadIO)
 
-class Monad m => MonadWayland m where
+class MonadIO m => MonadWayland m where
     liftWl :: Wayland a -> m a
     default liftWl :: (MonadTrans t, MonadWayland m1, m ~ t m1) => Wayland a -> m a
     liftWl = lift . liftWl

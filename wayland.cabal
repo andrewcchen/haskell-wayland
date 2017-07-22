@@ -16,23 +16,28 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Graphics.Wayland.Server
+                       Graphics.Wayland.Internal.Socket
                        Graphics.Wayland.Internal.Connection
                        Graphics.Wayland.Internal.Registry
                        Graphics.Wayland.Internal.Marshal
+                       Graphics.Wayland.Server.EventLoop
                        Graphics.Wayland.Server.Monad
                        Graphics.Wayland.Server.Monad.State
   build-depends:       base >= 4.9 && < 5
                      , containers >= 0.5 && < 1
                      , transformers >= 0.5 && < 1
                      , mtl >= 2 && < 3
+                     , lens >= 4 && < 5
                      , bytestring >= 0.10 && < 1
                      , vector >= 0.11 && < 1
-                     , spool < 2
+                     , spool < 1
                      -- , text >= 1 && < 2
                      , unix >= 2.7 && < 3
                      , network >= 2.6 && < 3
+                     , epoll >= 0.2.3 && < 1
   ghc-options:         -Wall
   default-language:    Haskell2010
+  c-sources:           cbits/socket.c
 
 test-suite wayland-test
   type:                exitcode-stdio-1.0

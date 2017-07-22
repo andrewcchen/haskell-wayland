@@ -37,6 +37,10 @@ resolver: lts-8.23
 # will not be run. This is useful for tweaking upstream packages.
 packages:
   - .
+  - location:
+      git: https://github.com/andrewcchen/epoll.git
+      commit: 55810411678f4b7ffdca5ded4e3c5c87ad31be57
+    extra-dep: true
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)

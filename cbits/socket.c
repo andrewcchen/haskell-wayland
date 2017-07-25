@@ -22,7 +22,7 @@ int connect_unix(int sockfd, const char* path, int len) {
                   offsetof(struct sockaddr_un, sun_path) + len);
 }
 
-int recv_fd(int sockfd) {
+int recv_fd(int sockfd, int flags) {
 	struct msghdr msg = {0};
 
 	// Is this even needed? Can iov not be left as NULL?
@@ -38,7 +38,7 @@ int recv_fd(int sockfd) {
 	msg.msg_control = (void*) cmsg;
 	msg.msg_controllen = CMSG_LEN(sizeof(int));
 
-	int ret = recvmsg(sockfd, &msg, 0);
+	int ret = recvmsg(sockfd, &msg, flags);
 	if (ret < 0) return ret;
 
 	struct cmsghdr* cptr = CMSG_FIRSTHDR(&msg);

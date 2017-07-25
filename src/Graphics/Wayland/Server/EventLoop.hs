@@ -1,97 +1,150 @@
-{-# LANGUAGE RecordWildCards, TemplateHaskell #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, RecordWildCards #-}
 
 module Graphics.Wayland.Server.EventLoop
-    ( WlClient(..)
+    ( ClientConn(..)
+    , Event(..)
     , EventLoop, newEventLoop, closeEventLoop
     , addSocket, removeSocket
     , addClient, removeClient
+    , newSocket, acceptClient
+    , poll
     ) where
 
-import Graphics.Wayland.Internal.Connection
-import qualified Graphics.Wayland.Server.Monad as W
+--import Graphics.Wayland.Internal.Connection
+import qualified Graphics.Wayland.Internal.Socket as Sock
+-- import qualified Graphics.Wayland.Server.Monad as W
 
-import Control.Lens
-import Control.Monad.State
+import Control.Monad (when)
+import Data.Bits ((.|.))
+import Data.Coerce (coerce)
 import Data.Dynamic
-import Data.Function
-import Data.Maybe
-import Foreign.C.Types
-import Network.Socket
+import Data.Either (partitionEithers)
+import Data.Function (on)
+import Data.Hashable (Hashable(..))
+import Data.List (intercalate)
+import Data.Maybe (fromJust)
+import Foreign.C.Types (CUInt)
 import System.IO
-import System.IO.Error
-import System.Posix.Types
-import qualified Data.Map.Strict as M
+import System.IO.Error (tryIOError, catchIOError)
+import qualified Data.HashTable.IO as H
+
 import qualified System.Linux.Epoll.Base as Epoll
+import System.Linux.Epoll.Base ((=~))
 
-newtype ListenSocket = ListenSocket Socket
-    deriving (Eq, Ord, Show)
 
-instance Ord Socket where
-    compare = compare `on` fdSocket
+newtype ListenSocket = ListenSocket Sock.Socket
+    deriving (Eq, Ord, Show, Hashable)
 
-data WlClient = WlClient
-    { clientSocket :: Socket
+data ClientConn = ClientConn
+    { clientSocket :: Sock.Socket
     , processId :: CUInt
     , userId :: CUInt
     , groupId :: CUInt
     , processCmdline :: String
-    } deriving (Eq, Ord, Show)
+    } deriving (Show)
+
+instance Eq ClientConn where
+    (==) = (==) `on` clientSocket
+instance Ord ClientConn where
+    compare = compare `on` clientSocket
+instance Hashable ClientConn where
+    hashWithSalt s ClientConn{..} = s `hashWithSalt` clientSocket
 
 data EventLoop = EventLoop
-    { _epoll :: Epoll.Device
-    , _listenDesc :: M.Map ListenSocket (Epoll.Descriptor Dynamic)
-    , _clientDesc :: M.Map WlClient (Epoll.Descriptor Dynamic)
+    { epoll :: Epoll.Device
+    , listenDescs :: H.BasicHashTable ListenSocket (Epoll.Descriptor Dynamic)
+    , clientDescs :: H.BasicHashTable ClientConn (Epoll.Descriptor Dynamic)
     }
-makeLenses ''EventLoop
 
-newEventLoop :: stuff -> IO EventLoop
-newEventLoop = undefined
+-- todo fix epoll
+newEventLoop :: IO EventLoop
+newEventLoop = do
+    epoll <- Epoll.create (fromJust $ Epoll.toSize 128)
+    listenDescs <- H.new
+    clientDescs <- H.new
+    return EventLoop{..}
 
 closeEventLoop :: EventLoop -> IO ()
-closeEventLoop = undefined
+closeEventLoop EventLoop{..} = do
+    Epoll.close epoll
+    H.mapM_ (\(s,_) -> Sock.close $ coerce s) listenDescs
+    H.mapM_ (\(c,_) -> Sock.close $ clientSocket c) clientDescs
 
-addSocket :: Socket -> EventLoop -> IO (ListenSocket, EventLoop)
-addSocket sock el = do
-    let fd = Fd $ fdSocket $ sock
+addSocket :: EventLoop -> Sock.Socket -> IO ListenSocket
+addSocket EventLoop{..} sock = do
+    let fd = Sock.fdSocket $ sock
         flags = [Epoll.inEvent]
         sock' = ListenSocket sock
-    desc <- Epoll.add (el ^. epoll) (toDyn sock') flags fd
-    return $ (sock', over listenDesc (M.insert sock' desc) el)
+    desc <- Epoll.add epoll (toDyn sock') flags fd
+    H.insert listenDescs sock' desc
+    return sock'
 
-addClient :: Socket -> EventLoop -> IO (WlClient, EventLoop)
-addClient sock el = flip runStateT el $ do
+addClient :: EventLoop -> Sock.Socket -> IO ClientConn
+addClient EventLoop{..} sock = do
     let clientSocket = sock
-    (processId,userId,groupId) <- liftIO $ getPeerCred sock
-    processCmdline <- liftIO $ getProcessCmdline processId
-    let client = WlClient{..}
-        fd = Fd $ fdSocket $ sock
+    (processId,userId,groupId) <- Sock.getPeerCred sock
+    processCmdline <- getProcessCmdline processId
+    let client = ClientConn{..}
+        fd = Sock.fdSocket $ sock
         flags = [Epoll.inEvent, Epoll.outEvent]
-    ep <- gets $ view epoll
-    desc <- liftIO (Epoll.add ep (toDyn client) flags fd)
-    modify' $ over clientDesc $ M.insert client desc
+    desc <- Epoll.add epoll (toDyn client) flags fd
+    H.insert clientDescs client desc
     return client
 
-removeSocket :: ListenSocket -> EventLoop -> IO EventLoop
-removeSocket sock el = do
-    let desc = (el ^. listenDesc) M.! sock
-    Epoll.delete (el ^. epoll) desc
-    return $ over listenDesc (M.delete sock) el
+removeSocket :: EventLoop -> ListenSocket -> IO ()
+removeSocket EventLoop{..} sock = do
+    desc <- fromJust <$> H.lookup listenDescs sock
+    Epoll.delete epoll desc
+    Sock.close $ coerce sock
+    H.delete listenDescs sock
 
-removeClient :: WlClient -> EventLoop -> IO EventLoop
-removeClient client el = do
-    let desc = (el ^. clientDesc) M.! client
-    Epoll.delete (el ^. epoll) desc
-    return $ over clientDesc (M.delete client) el
+removeClient :: EventLoop -> ClientConn -> IO ()
+removeClient EventLoop{..} client = do
+    desc <- fromJust <$> H.lookup clientDescs client
+    Epoll.delete epoll desc
+    Sock.close $ clientSocket client
+    H.delete clientDescs client
 
--- we need to return (clients connects, client disconnects, messages)
--- also we should really be calling epoll_pwait and masking SIGVTALRM
-dispatch :: W.MonadWayland m => Int -> EventLoop -> m (([WlClient], [Message]), EventLoop)
-dispatch timeout el = flip runStateT el $ do
-    let timeout' = fromJust $ Epoll.toDuration timeout
-    events <- liftIO $ Epoll.wait timeout' (el ^. epoll)
-    --fmap partitionEithers $ forM events $ \ev -> do
-    -- StateT EventLoop m [Either WlClient Message]
-    undefined
+newSocket :: EventLoop -> String -> IO ListenSocket
+newSocket el path = do
+    sock <- Sock.socket (Sock.sockStream .|. Sock.sockNonblock .|. Sock.sockCloexec)
+    Sock.bind sock path
+    addSocket el sock
+
+acceptClient :: EventLoop -> ListenSocket -> IO ClientConn
+acceptClient el (ListenSocket sock) = do
+    cSock <- Sock.accept sock (Sock.sockNonblock .|. Sock.sockCloexec)
+    addClient el cSock
+
+data Event = Connect ClientConn
+           | Disconnect ClientConn
+           | ReadAvailable ClientConn
+           | WriteAvailable ClientConn
+
+processEvent :: EventLoop -> Epoll.Event Dynamic -> IO (Either IOError Event)
+processEvent el event
+    | dynTypeRep dyn == typeRep (Proxy :: Proxy ListenSocket) = case () of
+      _ | eTyp =~ Epoll.inEvent -> tryIOError $
+            Connect <$> acceptClient el sock
+        | otherwise -> return $ Left $ userError $ show eTyp ++ show sock
+    | dynTypeRep dyn == typeRep (Proxy :: Proxy ClientConn) = case () of
+      _ | eTyp =~ Epoll.inEvent -> return $ Right $ ReadAvailable client
+        | eTyp =~ Epoll.outEvent -> return $ Right $ WriteAvailable client
+        | eTyp =~ Epoll.hangupEvent -> tryIOError $
+            removeClient el client >> return (Disconnect client)
+        | otherwise -> return $ Left $ userError $ show eTyp ++ show client
+    | otherwise = error "wtf"
+    where dyn = Epoll.eventRef event
+          eTyp = Epoll.eventType event
+          sock = fromJust $ fromDynamic dyn :: ListenSocket
+          client = fromJust $ fromDynamic dyn :: ClientConn
+
+poll :: EventLoop -> Int -> IO [Event]
+poll el@EventLoop{..} timeout = do
+    evs <- Epoll.wait (fromJust $ Epoll.toDuration timeout) epoll
+    (errs, res) <- partitionEithers <$> mapM (processEvent el) evs
+    when (length errs > 0) $ hPutStrLn stderr $ intercalate "\n" $ map (("poll: "++).show) errs
+    return res
 
 getProcessCmdline :: CUInt -> IO String
 getProcessCmdline processId = flip catchIOError (const $ return "") $

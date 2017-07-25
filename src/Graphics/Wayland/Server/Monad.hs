@@ -1,10 +1,10 @@
 {-# LANGUAGE DefaultSignatures, GeneralizedNewtypeDeriving, TypeFamilies #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Graphics.Wayland.Server.Monad
     ( WlState(..)
     , MonadWayland(..)
-    , Wayland, runWayland
-    , S.get, S.put, S.modify, S.modify', S.gets
+    , Wayland
     ) where
 
 --import Control.Monad
@@ -16,15 +16,15 @@ import Control.Monad.Reader
 import Control.Monad.State
 --import Control.Monad.Trans
 import Control.Monad.Writer
+import Control.Lens
 
+import Graphics.Wayland.Server.EventLoop
 import qualified Graphics.Wayland.Server.Monad.State as S
 
 data WlState = WlState
-    {
+    { _eventLoop :: EventLoop
     }
-
-runWayland :: Wayland a -> IO a
-runWayland = undefined -- todo
+makeLenses ''WlState
 
 newtype Wayland a = Wayland (S.StateT WlState IO a)
     deriving (Functor, Applicative, Monad, MonadIO)

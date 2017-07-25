@@ -1,39 +1,38 @@
 {-# LANGUAGE LambdaCase, RecordWildCards #-}
 
 module Graphics.Wayland.Internal.Connection
-    ( Message(..)
-    -- , readMessage, sendMessage
+    ( recvMessageHeader, recvMessageBody, recvMessageFds
+    , sendMessage
     ) where
 
 import Graphics.Wayland.Internal.Marshal
-import Graphics.Wayland.Internal.Registry
+import Graphics.Wayland.Internal.Object
+--import Graphics.Wayland.Internal.Registry
 import qualified Graphics.Wayland.Internal.Socket as Sock
 
-import Control.Exception.Base
+--import Control.Exception.Base
 import Control.Monad.Except
 import Control.Monad.ST
-import Control.Monad.State
-import Control.Monad.Trans.Maybe
+import Control.Monad.State.Lazy
+--import Control.Monad.Trans.Maybe
 import Data.Coerce
 import Data.Dynamic
-import Data.Maybe
+--import Data.Maybe
 import Data.Word
-import Foreign.ForeignPtr
+--import Foreign.ForeignPtr
 import Foreign.Marshal.Alloc
 import Foreign.Ptr
 import Foreign.Storable
 import System.Posix.Types
 import qualified Data.Vector.Storable as V
 import qualified Data.Vector.Storable.Mutable as MV
+import Control.Lens
 
--- todo encode specs into message
-data Message = Message
-    { msgSender :: WlId
-    , msgOpcode :: Int
-    , msgArguments :: [Dynamic]
-    }
-
--- todo handle EAGAIN
+--data Message = Message
+--    { msgSender :: WlId
+--    , msgOpcode :: Int
+--    , msgArguments :: [Dynamic]
+--    }
 
 recvMessageHeader :: Sock.Socket -> IO (Maybe (WlId, Int, Int))
 recvMessageHeader sock = allocaBytesAligned 8 4 $ \p -> do
@@ -44,15 +43,43 @@ recvMessageHeader sock = allocaBytesAligned 8 4 $ \p -> do
         len <- fromIntegral <$> (peek $ p `plusPtr` 6 :: IO Word16)
         return $ Just (sender, opcode, len-8)
 
-recvMessageBody :: Sock.Socket -> InterfaceSpec -> Int -> IO (Maybe (V.Vector Word32))
-recvMessageBody sock (_argSpecs) len = do
+recvMessageBody :: Sock.Socket -> Int -> IO (Maybe (V.Vector Word32))
+recvMessageBody sock len = do
     buf <- MV.unsafeNew (len `quot'` 4) :: IO (MV.MVector RealWorld Word32)
     MV.unsafeWith buf $ \p -> do
         cnt <- Sock.read sock (castPtr p) len
-        if cnt < len
-           then return Nothing
-           else Just <$> V.unsafeFreeze buf
+        if cnt < len then return Nothing
+                     else Just <$> V.unsafeFreeze buf
     where quot' a b = (a+b-1) `quot` b
+
+recvMessageFds :: Sock.Socket -> [ArgSpec] -> IO (Maybe [Fd])
+recvMessageFds sock argSpecs = do
+    let argTypes = map (view argType) argSpecs
+        fdCnt = foldr (+) 0 $ flip map argTypes $ \case
+            ArgFd -> 1
+            _ -> 0
+    fmap sequence $ sequence $ flip map (replicate fdCnt ()) $ \_ -> do
+        fd <- Sock.recvFdCloexec sock
+        if fd < 0 then return Nothing
+                  else return $ Just $ Fd fd
+
+sendMessage :: Sock.Socket -> InterfaceSpec -> WlId -> Int -> [Dynamic] -> IO Bool
+sendMessage sock spec sender opcode args = do
+    let func = view interfaceSendFuncs spec !! opcode
+        argTypes = map (view argType) $ view funcArgs func
+        len = 8 + (foldr (+) 0 $ map (uncurry sizeArg) $ zip argTypes args)
+    buf0 <- MV.new (len `quot` 4) :: IO (MV.MVector RealWorld Word32)
+    let buf4 = MV.unsafeCast (MV.tail buf0) :: MV.MVector RealWorld Word16
+        buf6 = MV.tail buf4
+        buf8 = MV.drop 2 buf0
+    MV.write buf0 0 $ coerce $ sender
+    MV.write buf4 0 $ fromIntegral opcode
+    MV.write buf6 0 $ fromIntegral len
+    flip evalStateT buf8 $ forM_ (zip argTypes args) $ \case
+        (ArgFd, arg) -> liftIO $ Sock.sendFd sock (fromDyn' arg) >> return ()
+        (typ, arg) -> writeArg typ arg >> return ()
+    ret <- MV.unsafeWith buf0 $ \p -> Sock.write sock (castPtr p) len
+    return $ ret == len
 
 {-
 -- todo use vector for buf

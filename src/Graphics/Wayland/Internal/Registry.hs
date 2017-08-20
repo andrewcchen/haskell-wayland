@@ -28,6 +28,61 @@ import GHC.Prim
 import qualified Data.HashTable.IO as H
 import Data.Dynamic
 
+import qualified Data.IntMap.Lazy as M
+
+
+data RegistryError = ObjectDoesNotExist Word32
+                   | ObjectAlreadyExists Word32
+    deriving (Show)
+instance Exception RegistryError
+
+
+
+data Registry = ServerRegistry {-# UNPACK #-} (IORef RegState)
+              | ClientRegistry {-# UNPACK #-} (IORef RegState)
+
+regRef :: Registry -> IORef RegState
+regRef ServerRegistry ref = ref
+regRef ClientRegistry ref = ref
+
+data RegState = RegState
+    { nextId :: Word32
+    , freeIds :: [Word32]
+    , objs :: M.IntMap Object
+    }
+
+
+
+
+regGet :: Registry -> Word32 -> IO Object
+regGet reg i = do
+    os <- objs <$> readIORef (regRef reg)
+    maybe (throwIO $ ObjectDoesNotExist i) return $ M.lookup i os
+
+regDel :: Registry -> Object -> IO ()
+regDel reg obj = atomicModifyIORef ref $ \r -> do
+    let i = objId obj
+    when (M.notMember i $ objs r) $ throwIO $ ObjectDoesNotExist i
+    return (r { freeIds = i : freeIds r
+              , objs = M.delete i $ objs r
+              }, ())
+    where ref = regRef reg
+
+regAdd :: Registry -> Object -> IO ()
+regAdd reg obj = atomicModifyIORef (regRef reg) $ \r -> do
+    let i = objId obj
+    when (M.member i $ objs r) $ throwIO $ ObjectAlreadyExists i
+    return (r { objs = M.add i $ objs r }, ())
+
+regNew :: Registry -> InterfaceSpec -> IO Object
+regNew typ reg@(ServerRegistry ref) = atomicModifyIORef ref $ \r ->
+    if null (freeIds r) then do
+        o <- newObject typ (nextId r)
+        r { nextId = nextId r + 1 } regAdd kek
+
+
+
+
 --data Registry = Registry
 --    { _remoteIdBase :: Int
 --    , _localIdBase :: Int

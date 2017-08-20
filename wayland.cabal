@@ -15,33 +15,45 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Graphics.Wayland.Server
-                       Graphics.Wayland.Internal.Object
-                       Graphics.Wayland.Internal.Socket
-                       Graphics.Wayland.Internal.Connection
-                       Graphics.Wayland.Internal.Registry
-                       Graphics.Wayland.Internal.Marshal
-                       Graphics.Wayland.Server.EventLoop
-                       Graphics.Wayland.Server.Main
+  exposed-modules:     Graphics.Wayland.XML
+                       Graphics.Wayland.Server
+                       Graphics.Wayland.Object
+                       Graphics.Wayland.Marshal
+                       Graphics.Wayland.Registry
                        Graphics.Wayland.Server.Monad
-                       Graphics.Wayland.Server.Monad.State
-  other-modules:       Graphics.Wayland.Internal.Dynamic
-                       Graphics.Wayland.Server.Protocol.Example
+                       Graphics.Wayland.Server.EventLoop
+                       --Graphics.Wayland.Internal.Object
+                       --Graphics.Wayland.Internal.Socket
+                       --Graphics.Wayland.Internal.Connection
+                       --Graphics.Wayland.Internal.Registry
+                       --Graphics.Wayland.Internal.Marshal
+                       --Graphics.Wayland.Server.EventLoop
+                       --Graphics.Wayland.Server.Main
+                       --Graphics.Wayland.Server.Monad
+                       --Graphics.Wayland.Server.Monad.State
+--  other-modules:       --Graphics.Wayland.Internal.Dynamic
+--                       --Graphics.Wayland.Server.Protocol.Example
+  other-modules:       Graphics.Wayland.System.Epoll
+                       Graphics.Wayland.Internal.Socket
   build-depends:       base >= 4.9 && < 5
-                     , ghc-prim
-                     , containers >= 0.5 && < 1
+                     , primitive
+                     , exceptions >= 0.8 && < 1
                      , transformers >= 0.5 && < 1
                      , mtl >= 2 && < 3
                      , lens >= 4 && < 5
-                     , primitive
                      , bytestring >= 0.10 && < 1
                      , vector >= 0.11 && < 1
                      , spool
-                     , hashtables >= 1.2.1.1 && < 2
+                     , containers >= 0.5 && < 1
+                     , unordered-containers >= 0.2 && < 1
                      , hashable
+                     , hashtables >= 1.2.1.1 && < 2
+                     --, primitive
                      , unix >= 2.7 && < 3
                      , network >= 2.6 && < 3
                      , epoll >= 0.2.3 && < 1
+                     -- for code generators:
+                     , hxt, hxt-xpath, split
   ghc-options:         -Wall
   default-language:    Haskell2010
   c-sources:           cbits/socket.c

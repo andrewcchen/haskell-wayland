@@ -1,16 +1,14 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+--{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Graphics.Wayland.Internal.Object
     ( ArgType(..)
     , ArgSpec(..), argName, argType
     , FuncSpec(..), funcName, funcArgs
-    , InterfaceSpec(..), interfaceName, interfaceRecvFuncs, interfaceSendFuncs
-    , WlId(..)
-    , Message(..)
-    , Object, objId, objType, objInterfaceSpecs
-    , unsafeNewObject
+    , InterfaceSpec(..), interfaceName, interfaceServerFuns, interfaceClientFuns
+    , Object, objId, objType
+    , newObject
     ) where
 
 import Control.Lens
@@ -19,14 +17,13 @@ import Data.Hashable
 import Data.Typeable
 import Data.Unique
 import Data.Word
---import Unsafe.Coerce
 
 data ArgType = ArgInt
              | ArgUInt
              | ArgFixed
              | ArgString
-             | ArgObject TypeRep ArgNullable
-             | ArgNewId TypeRep
+             | ArgObject InterfaceSpec ArgNullable
+             | ArgNewId InterfaceSpec
              | ArgArray
              | ArgFd
     deriving (Eq, Ord, Show)
@@ -35,7 +32,7 @@ type ArgNullable = Bool
 data ArgSpec = ArgSpec
     { _argName :: String
     , _argType :: ArgType
-    } deriving (Eq, Ord, Show)
+    } deriving (Show)
 makeLenses ''ArgSpec
 
 data FuncSpec = FuncSpec
@@ -46,25 +43,20 @@ makeLenses ''FuncSpec
 
 data InterfaceSpec = InterfaceSpec
     { _interfaceName :: String
-    , _interfaceRecvFuncs :: [FuncSpec]
-    , _interfaceSendFuncs :: [FuncSpec]
-    } deriving (Eq, Ord, Show)
+    , _interfaceServerFuns :: [FuncSpec]
+    , _interfaceClientFuns :: [FuncSpec]
+    } deriving (Show)
 makeLenses ''InterfaceSpec
 
-newtype WlId = WlId Word32
-    deriving (Eq, Ord, Show, Hashable)
-
-data Message = Message
-    { msgOpcode :: Int
-    , msgSender :: WlId
-    , msgArgs :: [Dynamic]
-    }
+instance Eq InterfaceSpec where
+    (==) = (==) `on` _interfaceName
+instance Ord InterfaceSpec where
+    compare = compare `on` _interfaceName
 
 data Object = Object
     { objUnique :: Unique
-    , objId :: WlId
-    , objType :: TypeRep
-    , objInterfaceSpecs :: InterfaceSpec
+    , objId :: Word32
+    , objType :: InterfaceSpec
     }
 
 instance Eq Object where
@@ -74,7 +66,7 @@ instance Ord Object where
 instance Hashable Object where
     hashWithSalt s x = s `hashWithSalt` objUnique x
 
-unsafeNewObject :: TypeRep -> InterfaceSpec -> WlId -> IO Object
-unsafeNewObject objType objInterfaceSpecs objId = do
+newObject :: InterfaceSpec -> Word32 -> IO Object
+newObject objType objId = do
     objUnique <- newUnique
     return Object{..}

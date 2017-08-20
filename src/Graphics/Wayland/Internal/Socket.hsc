@@ -2,7 +2,7 @@
 #include <sys/socket.h>
 
 module Graphics.Wayland.Internal.Socket
-    ( Socket, fdSocket
+    ( Socket(..)
     , sockStream, sockNonblock, sockCloexec
     , socket, bind, connect, listen, accept, close
     , recv, send
@@ -27,14 +27,11 @@ import Foreign.Ptr (Ptr, nullPtr)
 import Foreign.Storable (peekByteOff)
 import System.Posix.Types (Fd(..))
 
-newtype Socket = Socket Fd
+newtype Socket = Socket { fdSocket :: Fd }
     deriving (Eq, Ord, Show)
 
 instance Hashable Socket where
     hashWithSalt s (Socket (Fd (CInt fd))) = s `hashWithSalt` fd
-
-fdSocket :: Socket -> Fd
-fdSocket (Socket fd) = fd
 
 foreign import ccall "sys/socket.h socket"
     c_socket :: CInt -> CInt -> CInt -> IO CInt

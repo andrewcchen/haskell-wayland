@@ -19,7 +19,7 @@ import System.Posix.Types
 
 data Device = Device Fd Int (Ptr Event)
 
-newtype CreateFlags = CreateFlags CInt
+newtype CreateFlags = CreateFlags CInt deriving (Eq)
 pattern Cloexec :: CreateFlags
 pattern Cloexec = CreateFlags #{const EPOLL_CLOEXEC}
 
@@ -38,7 +38,7 @@ close (Device fd _ ptr) = do
     closeFd fd
     free ptr
 
-newtype EventType = EventType CInt
+newtype EventType = EventType CInt deriving (Eq)
 pattern InEvent :: EventType
 pattern InEvent = EventType #{const EPOLLIN}
 pattern OutEvent :: EventType

@@ -74,3 +74,26 @@ acceptClient :: EventLoop -> Socket -> IO ClientConn
 acceptClient el sock = do
     clientSock <- Sock.accept sock (Sock.sockNonblock .|. Sock.sockCloexec)
     addClientSocket el clientSock
+
+data Event = Connect ClientConn
+           | Disconnect ClientConn
+           | ReadAvailable ClientConn
+           | WriteAvailable ClientConn
+
+processEpollEvent :: EventLoop -> Epoll.Event -> IO [Event]
+processEpollEvent el@EventLoop{..} (Epoll.Event fd evs) = do
+    mc <- M.lookup (fromIntegral fd) <$> readIORef clientSocks
+    case mc of
+        Nothing -> sequence [ Connect <$> acceptClient el (Socket fd)
+                                | Epoll.InEvent `elem` evs ]
+        Just client -> return $
+            if Epoll.HangupEvent `elem` evs
+               then [ Disconnect client ]
+               else [ ReadAvailable client | Epoll.InEvent `elem` evs ]
+                 ++ [ WriteAvailable client | Epoll.OutEvent `elem` evs ]
+
+poll :: EventLoop -> Int -> IO [Event]
+poll el@EventLoop{..} timeout = do
+    epollEvents <- if timeout == 0 then Epoll.waitNonblock epoll
+                                   else Epoll.wait epoll timeout
+    fmap concat $ sequence $ map (processEpollEvent el) epollEvents

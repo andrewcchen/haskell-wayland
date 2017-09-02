@@ -6,12 +6,12 @@
 module Graphics.Wayland.Server.Monad
     where
 
-import Control.Monad.Cont
-import Control.Monad.Except
-import Control.Monad.RWS
+--import Control.Monad.Cont
+--import Control.Monad.Except
+--import Control.Monad.RWS
 import Control.Monad.Reader
-import Control.Monad.State
-import Control.Monad.Writer
+--import Control.Monad.State
+--import Control.Monad.Writer
 import Control.Lens
 import Data.IORef
 import Data.Unique
@@ -22,49 +22,43 @@ import qualified Data.IntMap as M
 import Graphics.Wayland.Object
 import Graphics.Wayland.Registry
 import Graphics.Wayland.Server.EventLoop
-
-type Dispatcher m = Int -> Object -> [Dynamic] -> m ()
+import Graphics.Wayland.Server.Connection
 
 data Client m = Client
-    { clientUnique :: Unique
-    , _connection :: ClientConn
-    , _registry :: IORef Registry
-    , _dispatchers :: IORef (M.IntMap (Interface, Dispatcher m))
+    { connection :: ClientConn
+    , registry :: IORef Registry
+    , dispatchers :: IORef (M.IntMap (Interface, Dispatcher m))
     }
-makeLenses ''Client
 
-instance Eq (Client m) where
-    a == b = clientUnique a == clientUnique b
-instance Ord (Client m) where
-    a `compare` b = clientUnique a `compare` clientUnique b
-instance Hashable (Client m) where
-    hash Client{..} = hash clientUnique
-    hashWithSalt s Client{..} = s `hashWithSalt` clientUnique
 instance Show (Client m) where
-    show Client{..} = undefined -- TODO
+    show c = show (connection c)
+instance Eq (Client m) where
+    (==) = (==) `on` connection
+    {-# INLINE (==) #-}
+instance Ord (Client m) where
+    compare = compare `on` connection
+    {-# INLINE compare #-}
+instance Hashable (Client m) where
+    hashWithSalt s x = s `hashWithSalt` connection x
+    {-# INLINE hashWithSalt #-}
 
-data WlState = WlState
+data WlState m = WlState
     { eventLoop :: EventLoop
-    , _clients :: Int -- TODO
+    , clients :: IORef (M.IntMap (Client m))
     }
-makeLenses ''WlState
+--makeLenses ''WlState
 
-newtype Wayland a = Wayland { runWayland :: ReaderT WlState IO a }
+newtype Wayland m a = Wayland { runWayland :: ReaderT (WlState m) IO a }
     deriving (Functor, Applicative, Monad, MonadIO)
 
 class MonadIO m => MonadWayland m where
-    liftWl :: Wayland a -> m a
-    default liftWl :: (MonadTrans t, MonadWayland m1, m ~ t m1) => Wayland a -> m a
-    liftWl = lift . liftWl
+    liftWl :: Wayland m a -> m a
 
-wlAsks :: MonadWayland m => (WlState -> a) -> m a
+newtype Wayland' a = Wayland' (Wayland Wayland' a)
+    deriving (Functor, Applicative, Monad, MonadIO)
+
+instance MonadWayland Wayland' where
+    liftWl m = Wayland' m
+
+wlAsks :: MonadWayland m => (WlState m -> a) -> m a
 wlAsks = liftWl . Wayland . asks
-
-instance MonadWayland Wayland where
-    liftWl = id
-instance MonadWayland m => MonadWayland (ReaderT r m)
-instance (MonadWayland m, Monoid w) => MonadWayland (WriterT w m)
-instance MonadWayland m => MonadWayland (StateT s m)
-instance (MonadWayland m, Monoid w) => MonadWayland (RWST r w s m)
-instance MonadWayland m => MonadWayland (ExceptT e m)
-instance MonadWayland m => MonadWayland (ContT r m)

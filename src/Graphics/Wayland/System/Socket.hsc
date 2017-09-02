@@ -1,12 +1,12 @@
 #define _GNU_SOURCE
 #include <sys/socket.h>
 
-module Graphics.Wayland.Internal.Socket
+module Graphics.Wayland.System.Socket
     ( Socket(..)
     , sockStream, sockNonblock, sockCloexec
     , socket, bind, connect, listen, accept, close
     , recv, send
-    , read, write
+    --, read, write
     , recvFd, recvFdCloexec, sendFd
     , getPeerCred
     ) where
@@ -102,8 +102,8 @@ recv :: Socket -> CInt -> Ptr Word8 -> Int -> IO Int
 recv (Socket (Fd fd)) flags buf len =
     fromIntegral <$> c_recv fd buf (fromIntegral len) flags
 
-read :: Socket -> Ptr Word8 -> Int -> IO Int
-read sock = recv sock 0
+--read :: Socket -> Ptr Word8 -> Int -> IO Int
+--read sock = recv sock 0
 
 foreign import ccall "sys/socket.h send"
     c_send :: CInt -> Ptr Word8 -> #{type size_t} -> CInt -> IO #{type ssize_t}
@@ -112,23 +112,25 @@ send :: Socket -> CInt -> Ptr Word8 -> Int -> IO Int
 send (Socket (Fd fd)) flags buf len =
     fromIntegral <$> c_send fd buf (fromIntegral len) flags
 
-write :: Socket -> Ptr Word8 -> Int -> IO Int
-write sock = send sock 0
+--write :: Socket -> Ptr Word8 -> Int -> IO Int
+--write sock = send sock 0
 
 foreign import ccall "recv_fd"
-    c_recv_fd :: CInt -> CInt -> IO CInt
+   c_recv_fd :: CInt -> CInt -> IO CInt
 
-recvFd :: Socket -> IO CInt
-recvFd (Socket (Fd fd)) = c_recv_fd fd 0
+recvFd :: Socket -> IO Fd
+recvFd (Socket (Fd fd)) = fmap Fd $ throwErrnoIfMinus1 "recv_fd" $ c_recv_fd fd 0
 
-recvFdCloexec :: Socket -> IO CInt
-recvFdCloexec (Socket (Fd fd)) = c_recv_fd fd #{const MSG_CMSG_CLOEXEC}
+recvFdCloexec :: Socket -> IO Fd
+recvFdCloexec (Socket (Fd fd)) = fmap Fd $ throwErrnoIfMinus1 "recv_fd" $
+    c_recv_fd fd #{const MSG_CMSG_CLOEXEC}
 
 foreign import ccall "send_fd"
     c_send_fd :: CInt -> CInt -> IO CInt
 
-sendFd :: Socket -> Fd -> IO CInt
-sendFd (Socket (Fd fd)) (Fd fdToSend) = c_send_fd fd fdToSend
+sendFd :: Socket -> Fd -> IO ()
+sendFd (Socket (Fd fd)) (Fd fdToSend) = throwErrnoIfMinus1_ "send_fd" $
+    c_send_fd fd fdToSend
 
 foreign import ccall "sys/socket.h getsockopt"
     c_getsockopt :: CInt -> CInt -> CInt -> Ptr () -> Ptr CInt -> IO CInt

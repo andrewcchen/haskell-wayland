@@ -12,25 +12,25 @@ import Data.Hashable
 import Data.Typeable
 import Data.Unique
 
-data Argument = ArgInt
-              | ArgUInt
-              | ArgFixed
-              | ArgString
-              | ArgObject TypeRep Bool
-              | ArgNewId TypeRep
-              | ArgArray
-              | ArgFd
-    deriving (Eq, Ord, Show)
-type Function = [Argument]
-
-data Interface = Interface TypeRep [Function]
-    deriving (Show)
-instance Eq Interface where
-    Interface a _ == Interface b _ = a == b
-    {-# INLINE (==) #-}
-instance Ord Interface where
-    Interface a _ `compare` Interface b _ = a `compare` b
-    {-# INLINE compare #-}
+--data Argument = ArgInt
+--              | ArgUInt
+--              | ArgFixed
+--              | ArgString
+--              | ArgObject TypeRep Bool
+--              | ArgNewId TypeRep
+--              | ArgArray
+--              | ArgFd
+--    deriving (Eq, Ord, Show)
+--type Function = [Argument]
+--
+--data Interface = Interface TypeRep [Function]
+--    deriving (Show)
+--instance Eq Interface where
+--    Interface a _ == Interface b _ = a == b
+--    {-# INLINE (==) #-}
+--instance Ord Interface where
+--    Interface a _ `compare` Interface b _ = a `compare` b
+--    {-# INLINE compare #-}
 
 data Object = Object
     { objUnique :: Unique
@@ -45,6 +45,8 @@ instance Ord Object where
     compare = compare `on` objUnique
     {-# INLINE compare #-}
 instance Hashable Object where
+    hash = hash . objUnique
+    {-# INLINE hash #-}
     hashWithSalt s x = s `hashWithSalt` objUnique x
     {-# INLINE hashWithSalt #-}
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, RecordWildCards #-}
 
-module Graphics.Wayland.Server.EventLoop
+module Graphics.Wayland.Server.EventLoop.OLD
     ( Client(..)
     , Event(..)
     , EventLoop, newEventLoop, closeEventLoop

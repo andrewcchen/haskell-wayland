@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-9.1
+resolver: lts-9.2
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -37,10 +37,10 @@ resolver: lts-9.1
 # will not be run. This is useful for tweaking upstream packages.
 packages:
   - .
-  - location:
-      git: https://github.com/andrewcchen/epoll.git
-      commit: 55810411678f4b7ffdca5ded4e3c5c87ad31be57
-    extra-dep: true
+  #- location:
+  #    git: https://github.com/andrewcchen/epoll.git
+  #    commit: 55810411678f4b7ffdca5ded4e3c5c87ad31be57
+  #  extra-dep: true
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
